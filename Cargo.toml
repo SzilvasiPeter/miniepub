@@ -1,0 +1,49 @@
+[package]
+name = "miniepub"
+version = "0.1.0"
+edition = "2024"
+description = "A minimal EPUB reader library"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/SzilvasiPeter/miniepub"
+readme = "README.md"
+keywords = ["epub", "reader", "ebook"]
+categories = ["parser-implementations"]
+
+[dependencies]
+
+[lints.rust]
+# Safety
+let_underscore_drop = "warn"
+unsafe_code = "deny"
+
+# API Design
+missing_docs = "warn"
+missing_debug_implementations = "warn"
+missing_copy_implementations = "warn"
+unreachable_pub = "warn"
+unnameable_types = "warn"
+
+# Code Hygiene
+redundant_imports = "warn"
+unused_qualifications = "warn"
+unit_bindings = "warn"
+non_ascii_idents = "warn"
+
+[lints.clippy]
+all = "warn"
+pedantic = "warn"
+nursery = "warn"
+cargo = "warn"
+
+# restriction lint group
+absolute_paths = "warn"
+arbitrary_source_item_ordering = "warn"
+doc_paragraphs_missing_punctuation = "warn"
+expect_used = "warn"
+infinite_loop = "warn"
+min_ident_chars = "warn"
+panic = "warn"
+redundant_type_annotations = "warn"
+ref_patterns = "warn"
+unwrap_used = "warn"
+wildcard_enum_match_arm = "warn"
