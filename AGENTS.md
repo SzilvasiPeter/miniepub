@@ -28,6 +28,7 @@ Add new dependencies with `cargo add <crate> --no-default-features` to keep the 
 All linters are configured in `Cargo.toml` and run via just recipes:
 
 - `just lint` — format, clippy, deny, machete
+- `just lint-workflows` — actionlint + zizmor on `.github/workflows/`
 - `just check` — format, clippy, coverage gate (80% line minimum)
 - `just fmt` / `just clippy` / `just deny` / `just machete` / `just coverage` — individual steps
 
