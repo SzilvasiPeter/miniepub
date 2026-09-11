@@ -10,9 +10,10 @@ Design priorities: tiny dependency graph, low complexity, 80%+ line coverage, TD
 
 ## Code style constraints
 
-1. **No macros, lifetimes, unsafe, or async** — keep the code as simple as possible
-2. **Readability first** — prefer explicit, clear code over clever or terse patterns
-3. **Deterministic linting** — prefer lints with concrete rules over subjective style preferences
+1. **No macros, lifetimes, unsafe, or async** — keep the code as simple as possible.
+2. **Minimal and readable** — prefer the smallest code that expresses intent. Avoid ceremony, boilerplate, and scaffolding (temp files, multi-line setup) when a single idiomatic expression covers it.
+3. **No branching where an idiom fits** — fold conditionals into the language's standard shorthand instead of `if/else` blocks. In shell, use parameter expansion (`${VAR:-default}`, `${VAR:+$VAR..$TAG}`); in Rust, use combinators (`unwrap_or`, `or_else`, `filter_map`, iterator chains).
+4. **Deterministic linting** — use lints with concrete rules over subjective style preferences.
 
 ## Dependencies
 
