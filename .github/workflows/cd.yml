@@ -39,4 +39,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
-        run: gh release create "$TAG" --generate-notes
+        run: |
+          set -euo pipefail
+          NEW_TAG=$(git tag --sort=-creatordate | sed -n '1p')
+          OLD_TAG=$(git tag --sort=-creatordate | sed -n '2p')
+
+          # Oldest..newest tag limits the log to commits since the last release
+          RANGE="${OLD_TAG:+$OLD_TAG..}$NEW_TAG"
+          gh release create "$NEW_TAG" --notes "$(git log "$RANGE" --reverse --pretty=format:"* %s")"
