@@ -1,14 +1,15 @@
 //! A minimal EPUB reader library.
 
+mod error;
+pub use error::Error;
+
 use std::collections::HashMap;
-use std::error::Error as StdError;
-use std::fmt::{self, Formatter};
 use std::fs::File;
-use std::io::{Error as IoError, Read as _};
+use std::io::Read as _;
 use std::path::Path;
 
 use roxmltree::{Document, Error as XmlError, ParsingOptions};
-use zip::{ZipArchive, result::ZipError};
+use zip::ZipArchive;
 
 /// An opened EPUB book.
 #[derive(Debug)]
@@ -42,58 +43,6 @@ impl Book {
     #[must_use]
     pub fn chapters(&self) -> &[Chapter] {
         &self.chapters
-    }
-}
-
-/// An error that can occur while opening a book.
-#[derive(Debug)]
-pub enum Error {
-    /// An I/O error.
-    Io(IoError),
-    /// An archive (ZIP) error.
-    Zip(ZipError),
-    /// An XML parsing error.
-    Xml(XmlError),
-    /// The container manifest has no root element.
-    NoRootfile,
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Io(error) => write!(formatter, "I/O error: {error}"),
-            Self::Zip(error) => write!(formatter, "archive error: {error}"),
-            Self::Xml(error) => write!(formatter, "XML error: {error}"),
-            Self::NoRootfile => formatter.write_str("missing rootfile in container.xml"),
-        }
-    }
-}
-
-impl StdError for Error {
-    fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        match self {
-            Self::Io(error) => Some(error),
-            Self::Zip(error) => Some(error),
-            Self::Xml(_) | Self::NoRootfile => None,
-        }
-    }
-}
-
-impl From<IoError> for Error {
-    fn from(error: IoError) -> Self {
-        Self::Io(error)
-    }
-}
-
-impl From<ZipError> for Error {
-    fn from(error: ZipError) -> Self {
-        Self::Zip(error)
-    }
-}
-
-impl From<XmlError> for Error {
-    fn from(error: XmlError) -> Self {
-        Self::Xml(error)
     }
 }
 

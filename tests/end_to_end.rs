@@ -2,7 +2,7 @@
 
 use std::error::Error;
 
-use miniepub::open;
+use miniepub::{Error as MiniepubError, open};
 
 #[test]
 fn reads_all_chapters_from_minimal_v3() -> Result<(), Box<dyn Error>> {
@@ -15,4 +15,15 @@ fn reads_all_chapters_from_minimal_v3() -> Result<(), Box<dyn Error>> {
     assert!(chapter.content().contains("This is a paragraph."));
 
     Ok(())
+}
+
+#[test]
+fn returns_io_error_for_missing_file() {
+    assert!(
+        matches!(
+            open("tests/data/nonexistent.epub"),
+            Err(MiniepubError::Io(_))
+        ),
+        "expected Io error for a missing file"
+    );
 }
