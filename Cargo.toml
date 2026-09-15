@@ -11,7 +11,7 @@ categories = ["parser-implementations"]
 
 [dependencies]
 roxmltree = { version = "0.21.1", default-features = false, features = ["std"] }
-zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2-zlib-ng"] }
+zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
 [lints.rust]
 # Safety
