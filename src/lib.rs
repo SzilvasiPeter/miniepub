@@ -116,6 +116,7 @@ fn read_entry(archive: &mut ZipArchive<File>, entry_name: &str) -> Result<String
     Ok(buffer)
 }
 
+// EPUB content files include DOCTYPE declarations; roxmltree rejects them by default
 fn parse_xml(text: &str) -> Result<Document<'_>, XmlError> {
     Document::parse_with_options(
         text,
