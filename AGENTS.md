@@ -23,52 +23,20 @@ Add new dependencies with `cargo add <crate> --no-default-features` to keep the 
 | Crate | Why |
 |---|---|
 | `zip` | Read EPUB archives (which are ZIP files). |
-| `quick-xml` | Parse the XML metadata and content inside the archive. |
+| `roxmltree` | Parse the XML metadata and content inside the archive. |
 
 ## Verification
 
 All linters are configured in `Cargo.toml` and run via just recipes:
 
-- `just lint` — format, clippy, deny, machete
+- `just lint` — fmt, clippy, machete, audit, deny
 - `just lint-workflows` — actionlint + zizmor on `.github/workflows/`
-- `just check` — format, clippy, coverage gate (80% line minimum)
-- `just fmt` / `just clippy` / `just deny` / `just machete` / `just coverage` — individual steps
+- `just coverage` — coverage gate (80% line minimum)
 
-## Project structure
+## TDD Workflow
 
-Single crate, no workspace unless a CLI/bin is added.
+All changes must follow Test-Driven Development using `cargo nextest`.
 
-Planned modules (each maps 1:1 to an EPUB spec artifact):
-
-| Module | Responsibility |
-|---|---|
-| `lib.rs` | Public API (`Book`, `open`, `parse`) — thin re-exports only |
-| `error.rs` | Error enum + Result alias |
-| `container.rs` | META-INF/container.xml -> rootfile path |
-| `opf.rs` | metadata, manifest, spine |
-| `toc.rs` | EPUB2 NCX + EPUB3 nav |
-| `spine.rs` | Reading order resolution |
-| `chapter.rs` | Chapter content wrapper |
-
-Tests: `tests/fixtures.rs` (in-memory EPUB builder), `tests/end_to_end.rs`.
-
-## TDD workflow
-
-Never depend on fixture files on disk — build EPUBs in-memory in test helpers.
-
-Development loop:
-
-1. `cargo nextest run --lib` — fast feedback while developing.
-2. `cargo nextest run --lib <module>::` — focus on current module.
-3. `just coverage` — coverage gate after a feature lands.
-
-Corrupt-input tests: hand-craft broken byte vectors, assert exact `Error` variant.
-
-## Release workflow
-
-Handled by `release.sh` — mirror its shape when changing it:
-
-1. `cargo set-version --bump <major|minor|patch>` or `cargo set-version X.Y.Z` — no manual semver parsing or validation.
-2. `cargo check` to refresh `Cargo.lock`.
-3. Read the new version back with `cargo get package.version`.
-4. Commit `Cargo.toml` and `Cargo.lock` as `release: <version>`, tag `v<version>` (annotated), push current branch with tags.
+1. **Red**: Write a failing test -> `cargo nextest run --test <test_name>`
+2. **Green**: Write implementation -> `cargo nextest run --test <test_name>`
+3. **Refactor**: Clean up and verify -> `cargo nextest run`
