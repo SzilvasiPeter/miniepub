@@ -10,8 +10,9 @@ keywords = ["epub", "reader", "ebook"]
 categories = ["parser-implementations"]
 
 [dependencies]
-roxmltree = { version = "0.21.1", default-features = false, features = ["std"] }
-zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+noflate = { version = "0.1.2", default-features = false }
+rawzip = { version = "0.5.1", default-features = false, features = ["std"] }
+xml = { version = "1.4.0", default-features = false }
 
 [lints.rust]
 # Safety

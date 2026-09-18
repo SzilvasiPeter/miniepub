@@ -13,6 +13,7 @@ miniepub = "0.1"
 let book = miniepub::open("book.epub")?;
 for chapter in book.chapters() {
     println!("{}", chapter.title());
+    println!("{}", chapter.body());
 }
 ```
 

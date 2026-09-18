@@ -22,16 +22,18 @@ Add new dependencies with `cargo add <crate> --no-default-features` to keep the 
 
 | Crate | Why |
 |---|---|
-| `zip` | Read EPUB archives (which are ZIP files). |
-| `roxmltree` | Parse the XML metadata and content inside the archive. |
+| `rawzip` | Read EPUB archives (which are ZIP files). |
+| `noflate` | Compression algorithm to use during unzip |
+| `xml` | Parse the XML metadata and content inside the archive. |
 
 ## Verification
 
 All linters are configured in `Cargo.toml` and run via just recipes:
 
-- `just lint` — fmt, clippy, machete, audit, deny
-- `just lint-workflows` — actionlint + zizmor on `.github/workflows/`
-- `just coverage` — coverage gate (80% line minimum)
+- `just lint` - fmt, clippy, machete
+- `just lint-workflows` - actionlint + zizmor on `.github/workflows/`
+- `just coverage` - coverage gate (80% line minimum)
+- `just safety` - audit, geiger, deny 
 
 ## TDD Workflow
 
