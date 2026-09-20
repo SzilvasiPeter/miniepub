@@ -1,6 +1,6 @@
 [package]
 name = "miniepub"
-version = "0.1.1"
+version = "0.1.4"
 edition = "2024"
 description = "A minimal EPUB reader library"
 license = "MIT OR Apache-2.0"
