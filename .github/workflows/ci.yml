@@ -43,7 +43,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           name=actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz
-          gh release download v$ACTIONLINT_VERSION --repo rhysd/actionlint --pattern "$name" --dir "$RUNNER_TEMP/actionlint"
+          gh release download "v$ACTIONLINT_VERSION" --repo rhysd/actionlint --pattern "$name" --dir "$RUNNER_TEMP/actionlint"
           gh attestation verify "$RUNNER_TEMP/actionlint/$name" --repo rhysd/actionlint
           tar -xzf "$RUNNER_TEMP/actionlint/$name" -C "$RUNNER_TEMP/actionlint"
           echo "$RUNNER_TEMP/actionlint" >> "$GITHUB_PATH"

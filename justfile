@@ -5,6 +5,7 @@ lint:
 
 lint-workflows:
     actionlint .github/workflows/*.yml
+    shuck check --extend-select ALL --ignore S081 . # Ignore S081: file-header comments are noise inside `run:` blocks.
     zizmor .
 
 coverage:
@@ -15,6 +16,6 @@ open:
 
 safety:
     cargo audit
-    # Remove the `forbid-only` flag if the https://github.com/geiger-rs/cargo-geiger/issues/577 is solved.
+    # TODO: remove the `forbid-only` flag once the https://github.com/geiger-rs/cargo-geiger/issues/577 is solved.
     cargo geiger --forbid-only
     cargo deny check licenses advisories
