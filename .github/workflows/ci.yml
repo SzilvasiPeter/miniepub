@@ -39,6 +39,8 @@ jobs:
           tool: cargo-audit, cargo-deny, cargo-geiger, cargo-machete, zizmor, just
 
       - name: Install actionlint
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           name=actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz
           gh release download v$ACTIONLINT_VERSION --repo rhysd/actionlint --pattern "$name" --dir "$RUNNER_TEMP"
