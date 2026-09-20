@@ -36,7 +36,7 @@ jobs:
 
       - uses: taiki-e/install-action@9114bf4d891761788c546334fd37538eae1bf8b3 # v2.87.16
         with:
-          tool: cargo-audit, cargo-deny, cargo-geiger, cargo-machete, zizmor, just
+          tool: cargo-audit, cargo-deny, cargo-geiger, cargo-machete, shuck-cli, zizmor, just
 
       - name: Install actionlint
         env:
@@ -54,5 +54,9 @@ jobs:
       - name: Lint workflows
         run: just lint-workflows
 
+      # TODO: Add just coverage steps
+
       - name: Safety
         run: just safety
+
+      # TODO: Create GH page coverage report
