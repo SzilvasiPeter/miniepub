@@ -1,5 +1,6 @@
 //! Print the XHTML content files of an EPUB with `rawzip`, `noflate`, and `xml`.
 
+#![forbid(unsafe_code)]
 use std::error::Error;
 use std::fs;
 

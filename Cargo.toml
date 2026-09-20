@@ -16,13 +16,13 @@ xml = { version = "1.4.0", default-features = false }
 
 [lints.rust]
 # Safety
-let_underscore_drop = "warn"
 unsafe_code = "deny"
+let_underscore_drop = "warn"
 
 # API Design
-missing_docs = "warn"
-missing_debug_implementations = "warn"
 missing_copy_implementations = "warn"
+missing_debug_implementations = "warn"
+missing_docs = "warn"
 unreachable_pub = "warn"
 unnameable_types = "warn"
 
