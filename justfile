@@ -18,4 +18,4 @@ safety:
     cargo audit
     # TODO: remove the `forbid-only` flag once the https://github.com/geiger-rs/cargo-geiger/issues/577 is solved.
     cargo geiger --forbid-only
-    cargo deny check licenses advisories
+    cargo deny check
