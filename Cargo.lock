@@ -10,7 +10,7 @@ checksum = "afe0c9817c1ba0a80b5db29df781646e3aa21c644c402572d8e4d7c0c2853abf"
 
 [[package]]
 name = "miniepub"
-version = "0.1.5"
+version = "0.2.0"
 dependencies = [
  "mdream",
  "noflate",
