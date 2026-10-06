@@ -1,6 +1,7 @@
 //! A minimal EPUB reader library: parse a ZIP of XML files into structured chapters.
 
 #![forbid(unsafe_code)]
+#![warn(clippy::print_stdout, clippy::print_stderr)]
 use std::fs;
 use std::path::Path;
 
@@ -58,34 +59,45 @@ impl Book {
         &self.chapters
     }
 
-    /// Moves to the next chapter and returns it as markdown.
+    /// Moves to the next chapter.
     ///
     /// Stays on the current chapter if there is no next chapter.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the chapter cannot be read or decoded.
-    pub fn next_chapter(&mut self) -> Result<String, Error> {
-        let index = self
+    pub fn next_chapter(&mut self) {
+        self.current = self
             .current
             .checked_add(1)
             .filter(|&index| index < self.chapters.len())
             .unwrap_or(self.current);
-        self.current = index;
-        self.markdown_at(index)
     }
 
-    /// Moves back to the previous chapter and returns it as markdown.
+    /// Moves back to the previous chapter.
     ///
     /// Stays on the current chapter if there is no previous chapter.
+    pub fn previous_chapter(&mut self) {
+        self.current = self.current.checked_sub(1).unwrap_or(self.current);
+    }
+
+    /// Returns the current chapter as markdown.
     ///
     /// # Errors
     ///
     /// Returns an error if the chapter cannot be read or decoded.
-    pub fn previous_chapter(&mut self) -> Result<String, Error> {
-        let index = self.current.checked_sub(1).unwrap_or(self.current);
-        self.current = index;
-        self.markdown_at(index)
+    pub fn current_chapter(&self) -> Result<String, Error> {
+        self.chapter_at(self.current)
+    }
+
+    /// Returns the chapter at `index` as markdown.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `index` is out of bounds or the chapter cannot be read.
+    pub fn chapter_at(&self, index: usize) -> Result<String, Error> {
+        let Some(chapter) = self.chapters.get(index) else {
+            return Err(Error::IndexOutOfBounds(index));
+        };
+        let xhtml = read_entry(&self.archive, &chapter.path)?;
+        let html = String::from_utf8(xhtml)?;
+        Ok(html_to_markdown(&html, HTMLToMarkdownOptions::default()))
     }
 
     /// Returns the whole book converted to markdown.
@@ -95,17 +107,8 @@ impl Book {
     /// Returns an error if any chapter cannot be read or decoded.
     pub fn all(&self) -> Result<String, Error> {
         let chapters: Result<Vec<String>, Error> =
-            (0..self.chapters.len()).map(|index| self.markdown_at(index)).collect();
+            (0..self.chapters.len()).map(|index| self.chapter_at(index)).collect();
         Ok(chapters?.join("\n\n"))
-    }
-
-    fn markdown_at(&self, index: usize) -> Result<String, Error> {
-        let Some(chapter) = self.chapters.get(index) else {
-            return Ok(String::new());
-        };
-        let xhtml = read_entry(&self.archive, &chapter.path)?;
-        let html = String::from_utf8(xhtml)?;
-        Ok(html_to_markdown(&html, HTMLToMarkdownOptions::default()))
     }
 }
 

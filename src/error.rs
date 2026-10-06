@@ -26,6 +26,8 @@ pub enum Error {
     MissingRootfile,
     /// The nav document is missing from the manifest.
     MissingNav,
+    /// The chapter index is out of bounds.
+    IndexOutOfBounds(usize),
 }
 
 impl fmt::Display for Error {
@@ -40,6 +42,7 @@ impl fmt::Display for Error {
             Self::UnsupportedCompression(method) => write!(f, "unsupported compression: {method}"),
             Self::MissingRootfile => write!(f, "missing rootfile full-path in container.xml"),
             Self::MissingNav => write!(f, "missing nav document in manifest"),
+            Self::IndexOutOfBounds(index) => write!(f, "chapter index {index} out of bounds"),
         }
     }
 }
@@ -55,7 +58,8 @@ impl StdError for Error {
             | Self::EntryNotFound(_)
             | Self::UnsupportedCompression(_)
             | Self::MissingRootfile
-            | Self::MissingNav => None,
+            | Self::MissingNav
+            | Self::IndexOutOfBounds(_) => None,
         }
     }
 }
