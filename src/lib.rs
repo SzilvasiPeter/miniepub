@@ -1,7 +1,6 @@
 //! A minimal EPUB reader library: parse a ZIP of XML files into structured chapters.
 
 #![forbid(unsafe_code)]
-use std::error::Error;
 use std::fs;
 use std::path::Path;
 
@@ -9,6 +8,9 @@ use mdream::{html_to_markdown, types::HTMLToMarkdownOptions};
 use noflate::deflate::decompress;
 use rawzip::{CompressionMethod, ZipArchive, ZipSliceArchive};
 use xml::{EventReader, reader::XmlEvent};
+
+mod error;
+pub use error::Error;
 
 /// An opened EPUB book with a table of contents and chapter navigation.
 #[derive(Debug)]
@@ -31,17 +33,16 @@ pub struct Chapter {
 /// # Errors
 ///
 /// Returns an error if the file cannot be read or the EPUB structure is invalid.
-pub fn open(path: impl AsRef<Path>) -> Result<Book, Box<dyn Error>> {
+pub fn open(path: impl AsRef<Path>) -> Result<Book, Error> {
     let archive = ZipArchive::from_slice(fs::read(path)?)?;
     let container = read_entry(&archive, "META-INF/container.xml")?;
     let opf_path = attribute_values(&container, "rootfile", "full-path")
         .into_iter()
         .next()
-        .ok_or_else(|| "missing rootfile full-path in container.xml".to_owned())?;
+        .ok_or(Error::MissingRootfile)?;
     let opf = read_entry(&archive, &opf_path)?;
-    let nav_path = nav_href(&opf)
-        .map(|href| resolve_href(&opf_path, &href))
-        .ok_or_else(|| "missing nav document in manifest".to_owned())?;
+    let nav_path =
+        nav_href(&opf).map(|href| resolve_href(&opf_path, &href)).ok_or(Error::MissingNav)?;
     let nav = read_entry(&archive, &nav_path)?;
     let chapters = parse_nav(&nav)?
         .into_iter()
@@ -64,7 +65,7 @@ impl Book {
     /// # Errors
     ///
     /// Returns an error if the chapter cannot be read or decoded.
-    pub fn next_chapter(&mut self) -> Result<String, Box<dyn Error>> {
+    pub fn next_chapter(&mut self) -> Result<String, Error> {
         let index = self
             .current
             .checked_add(1)
@@ -81,7 +82,7 @@ impl Book {
     /// # Errors
     ///
     /// Returns an error if the chapter cannot be read or decoded.
-    pub fn previous_chapter(&mut self) -> Result<String, Box<dyn Error>> {
+    pub fn previous_chapter(&mut self) -> Result<String, Error> {
         let index = self.current.checked_sub(1).unwrap_or(self.current);
         self.current = index;
         self.markdown_at(index)
@@ -92,13 +93,13 @@ impl Book {
     /// # Errors
     ///
     /// Returns an error if any chapter cannot be read or decoded.
-    pub fn all(&self) -> Result<String, Box<dyn Error>> {
-        let chapters: Result<Vec<String>, Box<dyn Error>> =
+    pub fn all(&self) -> Result<String, Error> {
+        let chapters: Result<Vec<String>, Error> =
             (0..self.chapters.len()).map(|index| self.markdown_at(index)).collect();
         Ok(chapters?.join("\n\n"))
     }
 
-    fn markdown_at(&self, index: usize) -> Result<String, Box<dyn Error>> {
+    fn markdown_at(&self, index: usize) -> Result<String, Error> {
         let Some(chapter) = self.chapters.get(index) else {
             return Ok(String::new());
         };
@@ -108,7 +109,7 @@ impl Book {
     }
 }
 
-fn read_entry(archive: &ZipSliceArchive<Vec<u8>>, path: &str) -> Result<Vec<u8>, Box<dyn Error>> {
+fn read_entry(archive: &ZipSliceArchive<Vec<u8>>, path: &str) -> Result<Vec<u8>, Error> {
     let way_finder = archive
         .entries()
         .find_map(|entry| {
@@ -116,12 +117,12 @@ fn read_entry(archive: &ZipSliceArchive<Vec<u8>>, path: &str) -> Result<Vec<u8>,
             let name = entry.file_path().try_normalize().ok()?;
             (name.as_ref() == path).then_some(entry.wayfinder())
         })
-        .ok_or_else(|| format!("entry not found: {path}"))?;
+        .ok_or_else(|| Error::EntryNotFound(path.to_owned()))?;
     let entry = archive.get_entry(way_finder)?;
     let data = match entry.local_header().compression_method() {
         CompressionMethod::DEFLATE => decompress(entry.data())?,
         CompressionMethod::STORE => entry.data().to_vec(),
-        method => return Err(format!("unsupported compression method {method:?}").into()),
+        method => return Err(Error::UnsupportedCompression(format!("{method:?}"))),
     };
     Ok(data)
 }
@@ -198,7 +199,7 @@ impl Toc {
     }
 }
 
-fn parse_nav(xml: &[u8]) -> Result<Vec<(String, String)>, Box<dyn Error>> {
+fn parse_nav(xml: &[u8]) -> Result<Vec<(String, String)>, Error> {
     let mut toc = Toc::default();
     for event in EventReader::new(xml) {
         let event = event?;
