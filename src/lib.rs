@@ -57,15 +57,6 @@ impl Book {
         &self.chapters
     }
 
-    /// Returns the current chapter converted to markdown.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the chapter cannot be read or decoded.
-    pub fn markdown(&self) -> Result<String, Box<dyn Error>> {
-        self.markdown_at(self.current)
-    }
-
     /// Moves to the next chapter and returns it as markdown.
     ///
     /// Stays on the current chapter if there is no next chapter.
@@ -96,17 +87,6 @@ impl Book {
         self.markdown_at(index)
     }
 
-    /// Moves to the chapter at `index` and returns it as markdown.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `index` is out of bounds.
-    pub fn navigate(&mut self, index: usize) -> Result<String, Box<dyn Error>> {
-        let markdown = self.markdown_at(index)?;
-        self.current = index;
-        Ok(markdown)
-    }
-
     /// Returns the whole book converted to markdown.
     ///
     /// # Errors
@@ -119,12 +99,10 @@ impl Book {
     }
 
     fn markdown_at(&self, index: usize) -> Result<String, Box<dyn Error>> {
-        let path = &self
-            .chapters
-            .get(index)
-            .ok_or_else(|| format!("chapter index {index} out of bounds"))?
-            .path;
-        let xhtml = read_entry(&self.archive, path)?;
+        let Some(chapter) = self.chapters.get(index) else {
+            return Ok(String::new());
+        };
+        let xhtml = read_entry(&self.archive, &chapter.path)?;
         let html = String::from_utf8(xhtml)?;
         Ok(html_to_markdown(&html, HTMLToMarkdownOptions::default()))
     }

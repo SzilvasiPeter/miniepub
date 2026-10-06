@@ -30,7 +30,6 @@ println!("{}", book.markdown()?);
 // Navigate
 book.next_chapter()?;    // next chapter
 book.previous_chapter()?; // previous chapter
-book.navigate(2)?;       // jump to chapter 2
 println!("{}", book.all()?); // whole book as markdown
 ```
 

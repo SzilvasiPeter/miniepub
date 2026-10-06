@@ -23,8 +23,9 @@ Add new dependencies with `cargo add <crate> --no-default-features` to keep the 
 | Crate | Why |
 |---|---|
 | `rawzip` | Read EPUB archives (which are ZIP files). |
-| `noflate` | Compression algorithm to use during unzip |
+| `noflate` | Compression algorithm to use during unzip. |
 | `xml` | Parse the XML metadata and content inside the archive. |
+| `mdream` | Convert XHTML to markdown. |
 
 ## Verification
 
