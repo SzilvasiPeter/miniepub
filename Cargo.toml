@@ -1,25 +1,8 @@
-[package]
-name = "miniepub"
-version = "0.2.0"
-edition = "2024"
-description = "A minimal EPUB reader library"
-license = "MIT"
-repository = "https://github.com/SzilvasiPeter/miniepub"
-readme = "README.md"
-keywords = ["epub", "reader", "ebook"]
-categories = ["parser-implementations"]
+[workspace]
+members = ["core", "cli", "tui"]
+resolver = "3"
 
-[dependencies]
-mdream = "1.7.3"
-noflate = { version = "0.1.2", default-features = false }
-rawzip = { version = "0.5.1", default-features = false, features = ["std"] }
-xml = { version = "1.4.0", default-features = false }
-
-[dev-dependencies]
-assert_cmd = "2.2.2"
-predicates = "3.1.3"
-
-[lints.rust]
+[workspace.lints.rust]
 # Safety
 unsafe_code = "deny"
 let_underscore_drop = "warn"
@@ -37,7 +20,7 @@ unused_qualifications = "warn"
 unit_bindings = "warn"
 non_ascii_idents = "warn"
 
-[lints.clippy]
+[workspace.lints.clippy]
 all = "warn"
 pedantic = "warn"
 nursery = "warn"

@@ -1,0 +1,19 @@
+[package]
+name = "miniepub"
+version = "0.3.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/SzilvasiPeter/miniepub"
+description = "A minimal EPUB reader library"
+readme = "README.md"
+keywords = ["epub", "reader", "ebook"]
+categories = ["parser-implementations"]
+
+[dependencies]
+mdream = "1.7.3"
+noflate = { version = "0.1.2", default-features = false }
+rawzip = { version = "0.5.1", default-features = false, features = ["std"] }
+xml = { version = "1.4.0", default-features = false }
+
+[lints]
+workspace = true

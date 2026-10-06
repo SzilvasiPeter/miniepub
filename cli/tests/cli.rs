@@ -4,8 +4,8 @@
 use assert_cmd::Command;
 use predicates::str::contains;
 
-const EPUB: &str = "tests/data/multi-chapter.epub";
-const EPUB_SINGLE: &str = "tests/data/minimal-v3.epub";
+const EPUB: &str = "../core/tests/data/multi-chapter.epub";
+const EPUB_SINGLE: &str = "../core/tests/data/minimal-v3.epub";
 
 #[test]
 fn list_chapters_works() {

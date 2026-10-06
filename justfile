@@ -20,5 +20,6 @@ open:
 
 safety:
     cargo audit
-    cargo issafe
+    # TODO: re-enable once cargo-issafe supports workspaces: https://github.com/SzilvasiPeter/cargo-issafe/issues/1
+    # cargo issafe
     cargo deny check

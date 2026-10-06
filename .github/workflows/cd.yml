@@ -3,7 +3,9 @@ name: CD
 on:
   push:
     tags:
-      - "v*"
+      - "miniepub-v*"
+      - "miniepub-cli-v*"
+      - "miniepub-tui-v*"
 
 concurrency:
   group: publish-${{ github.ref }}
@@ -40,9 +42,10 @@ jobs:
         id: auth
 
       - name: Publish
-        run: cargo publish
+        run: cargo publish --package "${TAG%-v*}"
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+          TAG: ${{ github.ref_name }}
 
       - name: Create GitHub Release
         env:
@@ -50,9 +53,7 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          NEW_TAG=$(git tag --sort=-creatordate | sed -n '1p')
-          OLD_TAG=$(git tag --sort=-creatordate | sed -n '2p')
-
           # Oldest..newest tag limits the log to commits since the last release
-          RANGE="${OLD_TAG:+$OLD_TAG..}$NEW_TAG"
-          gh release create "$NEW_TAG" --notes "$(git log "$RANGE" --reverse --pretty=format:"* %s")"
+          OLD_TAG=$(git tag --sort=-creatordate | sed -n '2p')
+          RANGE="${OLD_TAG:+$OLD_TAG..}$TAG"
+          gh release create "$TAG" --notes "$(git log "$RANGE" --reverse --pretty=format:"* %s")"

@@ -1,0 +1,24 @@
+[package]
+name = "miniepub-cli"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/SzilvasiPeter/miniepub"
+description = "A minimal EPUB reader command line tool"
+readme = "README.md"
+keywords = ["epub", "cli", "ebook", "markdown"]
+categories = ["command-line-utilities"]
+
+[[bin]]
+name = "miniepub"
+path = "src/main.rs"
+
+[dependencies]
+miniepub = { path = "../core", version = "0.3.0" }
+
+[dev-dependencies]
+assert_cmd = "2.2.2"
+predicates = "3.1.3"
+
+[lints]
+workspace = true
