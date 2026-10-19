@@ -5,7 +5,7 @@
 use std::fs;
 use std::path::Path;
 
-use mdream::{html_to_markdown, types::HTMLToMarkdownOptions};
+use mdream::{html_to_markdown, types::HtmlToMarkdownOptions};
 use noflate::deflate::decompress;
 use rawzip::{CompressionMethod, ZipArchive, ZipSliceArchive};
 use xml::{EventReader, reader::XmlEvent};
@@ -97,7 +97,7 @@ impl Book {
         };
         let xhtml = read_entry(&self.archive, &chapter.path)?;
         let html = String::from_utf8(xhtml)?;
-        Ok(html_to_markdown(&html, HTMLToMarkdownOptions::default()))
+        Ok(html_to_markdown(&html, HtmlToMarkdownOptions::default()))
     }
 
     /// Returns the whole book converted to markdown.
