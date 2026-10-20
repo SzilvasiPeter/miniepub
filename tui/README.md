@@ -8,7 +8,7 @@ A minimal EPUB reader terminal user interface. Opens the book in a full-screen, 
 miniepub-tui <epub-file>
 ```
 
-The viewer takes over the terminal (alternate screen + raw mode) and shows one chapter at a time, wrapped to the terminal width. On exit the original screen is restored — even after errors or a panic.
+The viewer takes over the terminal (alternate screen + raw mode) and shows one chapter at a time, wrapped to the terminal width. Quitting updates the reading position, so reopening the book continues where you left off — even down to the scroll offset. On exit the original screen is restored — even after errors or a panic.
 
 ## Keys
 

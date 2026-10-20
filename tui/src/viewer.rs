@@ -1,6 +1,11 @@
 //! A full-screen, `less`-like reader on the alternate screen.
 
+use std::collections::hash_map::DefaultHasher;
+use std::env;
+use std::fs;
+use std::hash::{Hash, Hasher};
 use std::io::{self, Write};
+use std::path::{Path, PathBuf};
 
 use miniepub::{Book, Error};
 use termimad::crossterm::style::{Attribute, Print, SetAttribute};
@@ -32,6 +37,51 @@ fn truncate_to(text: &str, width: usize) -> String {
     }
     let cut: String = text.chars().take(width - 1).collect();
     format!("{cut}…")
+}
+
+/// Where a book was left off: the chapter index and the scroll offset inside it.
+#[derive(Debug, Default, PartialEq, Eq)]
+struct Progress {
+    index: usize,
+    scroll: usize,
+}
+
+impl Progress {
+    /// Reads where the book was left off, defaulting to its beginning.
+    fn load(base: Option<&Path>, book: &Path) -> Self {
+        base.and_then(|base| fs::read_to_string(Self::state_file(base, book)).ok())
+            .and_then(|state| parse_state(&state).map(|(index, scroll)| Self { index, scroll }))
+            .unwrap_or_default()
+    }
+
+    /// Best-effort write of where the book was left off; no state directory drops it.
+    fn save(self, base: Option<&Path>, book: &Path) -> io::Result<()> {
+        let Some(base) = base else {
+            return Ok(());
+        };
+        fs::create_dir_all(base.join("progress"))?;
+        fs::write(Self::state_file(base, book), format!("{} {}", self.index, self.scroll))
+    }
+
+    /// The file holding this book's progress: the book path, hashed, inside `base`.
+    fn state_file(base: &Path, book: &Path) -> PathBuf {
+        let mut hasher = DefaultHasher::new();
+        book.canonicalize().unwrap_or_else(|_| book.to_path_buf()).hash(&mut hasher);
+        base.join("progress").join(format!("{:016x}", hasher.finish()))
+    }
+}
+
+/// Parses the saved `index scroll` pair.
+fn parse_state(state: &str) -> Option<(usize, usize)> {
+    let mut words = state.split_whitespace().filter_map(|word| word.parse::<usize>().ok());
+    Some((words.next()?, words.next()?))
+}
+
+/// The directory holding all reading positions, or `None` when no state home is known.
+pub fn state_base() -> Option<PathBuf> {
+    let xdg = env::var_os("XDG_STATE_HOME").filter(|dir| !dir.as_os_str().is_empty());
+    let home_state = env::var_os("HOME").map(|home| PathBuf::from(home).join(".local/state"));
+    xdg.map(PathBuf::from).or(home_state).map(|dir| dir.join("miniepub"))
 }
 
 /// What a key press asks the viewer to do.
@@ -125,6 +175,19 @@ impl<'b> Viewer<'b> {
             sidebar_enabled: true,
         };
         viewer.load(0)?;
+        Ok(viewer)
+    }
+
+    /// Opens the book at where `progress` left off.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the saved chapter cannot be read.
+    fn resume(book: &'b Book, screen: Area, progress: &Progress) -> Result<Self, Error> {
+        let mut viewer = Self::new(book, screen)?;
+        viewer.index = progress.index.min(viewer.book.chapters().len().saturating_sub(1));
+        viewer.load(viewer.index)?;
+        viewer.scroll = progress.scroll.min(viewer.boundary());
         Ok(viewer)
     }
 
@@ -324,11 +387,13 @@ impl Drop for TerminalGuard {
 
 /// Takes over the screen and runs the key loop until the viewer quits.
 ///
+/// The reading position is restored from `state` when present, and written back on quit.
+///
 /// # Errors
 ///
 /// Returns an error when a chapter cannot be read or the terminal misbehaves.
-pub fn run(book: &Book) -> Result<(), Error> {
-    let mut viewer = Viewer::new(book, screen_area())?;
+pub fn run(book_path: &Path, book: &Book, state: Option<&Path>) -> Result<(), Error> {
+    let mut viewer = Viewer::resume(book, screen_area(), &Progress::load(state, book_path))?;
     let _guard = TerminalGuard;
     let mut out = io::stdout();
     queue!(out, EnterAlternateScreen)?;
@@ -338,7 +403,12 @@ pub fn run(book: &Book) -> Result<(), Error> {
         viewer.render(&mut out)?;
         match event::read()? {
             Event::Key(key) => match action_for(key) {
-                Some(Action::Quit) => break,
+                Some(Action::Quit) => {
+                    Progress { index: viewer.index, scroll: viewer.scroll }
+                        .save(state, book_path)
+                        .ok();
+                    break;
+                }
                 Some(action) => viewer.apply(&action)?,
                 None => {}
             },
@@ -355,8 +425,13 @@ mod tests {
 
     use termimad::crossterm::event::{KeyCode::*, KeyEventState, MediaKeyCode, ModifierKeyCode};
 
+    use std::env;
+    use std::fs;
+    use std::path::{Path, PathBuf};
+    use std::process;
+
     use super::{
-        Action, Area, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, Viewer, action_for,
+        Action, Area, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, Progress, Viewer, action_for,
         sidebar_line, truncate_to,
     };
 
@@ -446,6 +521,81 @@ mod tests {
         assert_eq!(truncate_to("an overly long status line", 10).chars().count(), 10);
         assert!(truncate_to("an overly long status line", 10).ends_with('…'));
         assert_eq!(truncate_to("any", 0), "");
+    }
+
+    /// A throwaway state directory unique to this test and process.
+    fn scratch(tag: &str) -> PathBuf {
+        let dir = env::temp_dir().join(format!("miniepub-test-{tag}-{}", process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn progress_round_trips() {
+        let base = scratch("roundtrip");
+        let book = Path::new("books/island.epub");
+
+        Progress { index: 2, scroll: 7 }.save(Some(&base), book).unwrap();
+        assert_eq!(Progress::load(Some(&base), book), Progress { index: 2, scroll: 7 });
+    }
+
+    #[test]
+    fn progress_defaults_without_a_saved_file() {
+        let base = scratch("unsaved");
+
+        assert_eq!(
+            Progress::load(Some(&base), Path::new("any.epub")),
+            Progress { index: 0, scroll: 0 }
+        );
+    }
+
+    #[test]
+    fn keeps_progress_per_book() {
+        let base = scratch("perbook");
+        let island = Path::new("books/island.epub");
+        let river = Path::new("books/river.epub");
+
+        Progress { index: 1, scroll: 2 }.save(Some(&base), island).unwrap();
+        Progress { index: 3, scroll: 4 }.save(Some(&base), river).unwrap();
+        assert_eq!(Progress::load(Some(&base), island), Progress { index: 1, scroll: 2 });
+        assert_eq!(Progress::load(Some(&base), river), Progress { index: 3, scroll: 4 });
+    }
+
+    #[test]
+    fn discards_an_unreadable_state_file() {
+        let base = scratch("garbage");
+        let book = Path::new("books/island.epub");
+        let file = Progress::state_file(&base, book);
+        fs::create_dir_all(file.parent().unwrap()).unwrap();
+        fs::write(&file, "not numbers").unwrap();
+
+        assert_eq!(Progress::load(Some(&base), book), Progress { index: 0, scroll: 0 });
+    }
+
+    #[test]
+    fn ignores_a_missing_state_directory() {
+        let book = Path::new("x.epub");
+
+        Progress { index: 5, scroll: 1 }.save(None, book).unwrap();
+        assert_eq!(Progress::load(None, book), Progress { index: 0, scroll: 0 });
+    }
+
+    #[test]
+    fn reopens_at_the_saved_position() {
+        let book = miniepub::open(EPUB).unwrap();
+
+        let viewer = Viewer::resume(&book, SLIVER, &Progress { index: 1, scroll: 1 }).unwrap();
+        assert_eq!(viewer.index, 1);
+        assert_eq!(viewer.scroll, 1);
+    }
+
+    #[test]
+    fn clamps_a_stale_saved_position() {
+        let book = miniepub::open(EPUB).unwrap();
+
+        let viewer = Viewer::resume(&book, SLIVER, &Progress { index: 9, scroll: 9_999 }).unwrap();
+        assert_eq!(viewer.index, 2);
+        assert_eq!(viewer.scroll, viewer.boundary());
     }
 
     #[test]

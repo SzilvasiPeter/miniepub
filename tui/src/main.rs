@@ -27,6 +27,8 @@ fn main() {
 }
 
 fn run(path: &str) -> Result<(), miniepub::Error> {
+    use std::path::Path;
+
     let book = miniepub::open(path)?;
-    viewer::run(&book)
+    viewer::run(Path::new(path), &book, viewer::state_base().as_deref())
 }
