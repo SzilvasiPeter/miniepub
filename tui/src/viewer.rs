@@ -3,14 +3,36 @@
 use std::io::{self, Write};
 
 use miniepub::{Book, Error};
+use termimad::crossterm::style::{Attribute, Print, SetAttribute};
 use termimad::crossterm::{
     cursor::{Hide, MoveTo, Show},
     event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
     execute, queue,
-    style::Print,
     terminal::{self, Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use termimad::{Area, MadSkin, TextView};
+
+/// The width of the chapter sidebar.
+const SIDEBAR_WIDTH: u16 = 20;
+/// The narrowest text pane that still makes the sidebar worth the room.
+const MIN_TEXT_WIDTH: u16 = 50;
+
+/// A sidebar row: the mark, then the title truncated to the pane width with an ellipsis.
+fn sidebar_line(mark: &str, title: &str) -> String {
+    truncate_to(&format!("{mark}{title}"), SIDEBAR_WIDTH as usize)
+}
+
+/// A line clamped to `width` display characters, ending with an ellipsis when cut.
+fn truncate_to(text: &str, width: usize) -> String {
+    if text.chars().count() <= width {
+        return text.to_owned();
+    }
+    if width == 0 {
+        return String::new();
+    }
+    let cut: String = text.chars().take(width - 1).collect();
+    format!("{cut}…")
+}
 
 /// What a key press asks the viewer to do.
 #[derive(Debug, PartialEq, Eq)]
@@ -27,6 +49,8 @@ enum Action {
     NextChapter,
     /// Open the previous chapter.
     PreviousChapter,
+    /// Show or hide the chapter sidebar.
+    ToggleSidebar,
     /// Close the viewer.
     Quit,
 }
@@ -45,10 +69,10 @@ fn action_for(key: KeyEvent) -> Option<Action> {
         KeyCode::End | KeyCode::Char('G') => Some(Action::Bottom),
         KeyCode::Left => Some(Action::PreviousChapter),
         KeyCode::Right => Some(Action::NextChapter),
+        KeyCode::Tab => Some(Action::ToggleSidebar),
         KeyCode::Esc | KeyCode::Char('q') => Some(Action::Quit),
         KeyCode::Char('c') if key.modifiers == KeyModifiers::CONTROL => Some(Action::Quit),
         KeyCode::Enter
-        | KeyCode::Tab
         | KeyCode::BackTab
         | KeyCode::Delete
         | KeyCode::Insert
@@ -78,8 +102,10 @@ struct Viewer<'b> {
     scroll: usize,
     /// The styles used to turn markdown into terminal text.
     skin: MadSkin,
-    /// The screen area the chapter text may occupy.
-    area: Area,
+    /// The whole screen, minus the row reserved for the status line.
+    screen: Area,
+    /// Whether the chapter sidebar is wanted; it may still not fit the screen.
+    sidebar_enabled: bool,
 }
 
 impl<'b> Viewer<'b> {
@@ -88,17 +114,45 @@ impl<'b> Viewer<'b> {
     /// # Errors
     ///
     /// Returns an error when the first chapter cannot be read.
-    fn new(book: &'b Book, area: Area) -> Result<Self, Error> {
+    fn new(book: &'b Book, screen: Area) -> Result<Self, Error> {
         let mut viewer = Self {
             book,
             index: 0,
             markdown: String::new(),
             scroll: 0,
             skin: MadSkin::default(),
-            area,
+            screen,
+            sidebar_enabled: true,
         };
         viewer.load(0)?;
         Ok(viewer)
+    }
+
+    /// The area the chapter list occupies, or `None` when hidden or too narrow.
+    fn sidebar_area(&self) -> Option<Area> {
+        let too_narrow = self.screen.width < SIDEBAR_WIDTH + 2 + MIN_TEXT_WIDTH;
+        (self.sidebar_enabled && !too_narrow).then_some(Area {
+            left: self.screen.left,
+            top: self.screen.top,
+            width: SIDEBAR_WIDTH,
+            height: self.screen.height,
+        })
+    }
+
+    /// The area the chapter text occupies: everything but the sidebar, with a margin column.
+    fn text_area(&self) -> Area {
+        let sidebar_width = match self.sidebar_area() {
+            Some(_) => SIDEBAR_WIDTH + 2,
+            None => 0,
+        };
+        let mut area = Area {
+            left: self.screen.left + sidebar_width,
+            top: self.screen.top,
+            width: self.screen.width - sidebar_width,
+            height: self.screen.height,
+        };
+        area.pad_for_max_width(100);
+        area
     }
 
     /// Loads the markdown of the chapter at `index`; out of bounds leaves the viewer as is.
@@ -126,22 +180,18 @@ impl<'b> Viewer<'b> {
         match action {
             Action::ScrollLines(lines) => self.scroll_lines(*lines),
             Action::ScrollPages(pages) => {
-                self.scroll_lines(i32::from(self.area.height) * *pages);
+                self.scroll_lines(i32::from(self.text_area().height) * *pages);
             }
             Action::Top => self.scroll = 0,
             Action::Bottom => self.scroll = self.boundary(),
             Action::NextChapter => self.load(self.index.saturating_add(1))?,
             Action::PreviousChapter => self.load(self.index.saturating_sub(1))?,
+            Action::ToggleSidebar => self.sidebar_enabled = !self.sidebar_enabled,
             Action::Quit => {}
         }
         Ok(())
     }
 
-    /// Loads the chapter `direction` chapters away when it exists.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when that chapter cannot be read.
     /// Draws the chapter text and the status line into `out`.
     ///
     /// # Errors
@@ -149,25 +199,83 @@ impl<'b> Viewer<'b> {
     /// Returns an error when the terminal cannot be written.
     fn render<W: Write>(&self, out: &mut W) -> io::Result<()> {
         queue!(out, Clear(ClearType::All))?;
-        let text = self.skin.area_text(&self.markdown, &self.area);
-        let mut view = TextView::from(&self.area, &text);
+        self.draw_sidebar(out)?;
+        let area = self.text_area();
+        let text = self.skin.area_text(&self.markdown, &area);
+        let mut view = TextView::from(&area, &text);
         view.set_scroll(self.scroll);
         view.write_on(out).map_err(io::Error::other)?;
-        let boundary = text.lines.len().saturating_sub(self.area.height as usize);
+        let boundary = text.lines.len().saturating_sub(area.height as usize);
         let percent = view.scroll * 100 / boundary.max(1);
-        queue!(out, MoveTo(0, self.area.top + self.area.height), Print(self.status(percent)))?;
+        queue!(
+            out,
+            MoveTo(area.left, area.top + area.height),
+            Print(truncate_to(&self.status(percent), area.width as usize))
+        )?;
         out.flush()
+    }
+
+    /// Draws the chapter list and its separator column at the left of the screen.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the terminal cannot be written.
+    fn draw_sidebar<W: Write>(&self, out: &mut W) -> io::Result<()> {
+        let Some(sidebar) = self.sidebar_area() else {
+            return Ok(());
+        };
+        let chapters = self.visible_chapters();
+        for (row, chapter) in (0..sidebar.height).zip(chapters) {
+            self.draw_sidebar_row(out, &sidebar, row, chapter)?;
+        }
+        for row in 0..sidebar.height {
+            queue!(out, MoveTo(sidebar.left + sidebar.width, sidebar.top + row), Print("│"))?;
+        }
+        Ok(())
+    }
+
+    /// Draws one sidebar row, bolded when it shows the current chapter.
+    fn draw_sidebar_row<W: Write>(
+        &self,
+        out: &mut W,
+        sidebar: &Area,
+        row: u16,
+        chapter: usize,
+    ) -> io::Result<()> {
+        let marked = chapter == self.index;
+        let mark = if marked { "▸ " } else { "· " };
+        let attribute = if marked { Attribute::Bold } else { Attribute::Reset };
+        let title = &self.book.chapters()[chapter].title;
+        queue!(
+            out,
+            SetAttribute(attribute),
+            MoveTo(sidebar.left, sidebar.top + row),
+            Print(sidebar_line(mark, title))
+        )
+    }
+
+    /// The chapters shown in the sidebar, half before and half after the current one.
+    fn visible_chapters(&self) -> impl Iterator<Item = usize> + '_ {
+        let count = self.book.chapters().len();
+        let height = self.sidebar_area().map_or(1, |sidebar| sidebar.height as usize);
+        let first = if count <= height {
+            0
+        } else {
+            self.index.saturating_sub(height / 2).min(count - height)
+        };
+        (first..(first + height).min(count)).take(height)
     }
 
     /// Re-fits the area to the current screen after a resize.
     fn resize(&mut self) {
-        self.area = screen_area();
+        self.screen = screen_area();
     }
 
     /// The last scroll offset that puts chapter text in every row of the area.
     fn boundary(&self) -> usize {
-        let content = self.skin.area_text(&self.markdown, &self.area).lines.len();
-        content.saturating_sub(self.area.height as usize)
+        let area = self.text_area();
+        let content = self.skin.area_text(&self.markdown, &area).lines.len();
+        content.saturating_sub(area.height as usize)
     }
 
     /// Moves the scroll by `lines`, clamped to the chapter text.
@@ -185,7 +293,7 @@ impl<'b> Viewer<'b> {
     fn status(&self, percent: usize) -> String {
         let chapter = &self.book.chapters()[self.index];
         format!(
-            " {} · {} / {} · {percent}% · ←/→ chapter · q quit",
+            " {} · {} / {} · {percent}% · Tab chapters · q quit",
             chapter.title,
             self.index + 1,
             self.book.chapters().len()
@@ -247,13 +355,20 @@ mod tests {
 
     use termimad::crossterm::event::{KeyCode::*, KeyEventState, MediaKeyCode, ModifierKeyCode};
 
-    use super::{Action, Area, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, Viewer, action_for};
+    use super::{
+        Action, Area, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, Viewer, action_for,
+        sidebar_line, truncate_to,
+    };
 
     const EPUB: &str = "../core/tests/data/multi-chapter.epub";
     /// A viewport taller than the chapter text, so it never scrolls.
     const PAGE: Area = Area { left: 0, top: 0, width: 80, height: 24 };
     /// A viewport shorter than the chapter text, so it scrolls.
     const SLIVER: Area = Area { left: 0, top: 0, width: 80, height: 2 };
+    /// A screen wide enough to show the sidebar.
+    const WIDE: Area = Area { left: 0, top: 0, width: 120, height: 20 };
+    /// A screen too narrow to show the sidebar.
+    const NARROW: Area = Area { left: 0, top: 0, width: 40, height: 10 };
 
     fn pressed(code: KeyCode, modifiers: KeyModifiers) -> KeyEvent {
         KeyEvent::new(code, modifiers)
@@ -303,6 +418,11 @@ mod tests {
     }
 
     #[test]
+    fn maps_toggle_key() {
+        assert_eq!(action_for(plain(Tab)), Some(Action::ToggleSidebar));
+    }
+
+    #[test]
     fn maps_quit_keys() {
         assert_eq!(action_for(plain(Char('q'))), Some(Action::Quit));
         assert_eq!(action_for(plain(Esc)), Some(Action::Quit));
@@ -311,10 +431,27 @@ mod tests {
     }
 
     #[test]
+    fn hints_the_sidebar_toggle() {
+        let book = miniepub::open(EPUB).unwrap();
+        let mut viewer = Viewer::new(&book, PAGE).unwrap();
+
+        assert!(render_chapter(&viewer).contains("Tab chapters"));
+        viewer.apply(&Action::ToggleSidebar).unwrap();
+        assert!(render_chapter(&viewer).contains("Tab chapters"));
+    }
+
+    #[test]
+    fn truncates_long_status() {
+        assert_eq!(truncate_to("short", 10), "short");
+        assert_eq!(truncate_to("an overly long status line", 10).chars().count(), 10);
+        assert!(truncate_to("an overly long status line", 10).ends_with('…'));
+        assert_eq!(truncate_to("any", 0), "");
+    }
+
+    #[test]
     fn ignores_unused_keys() {
         let unused = [
             plain(Enter),
-            plain(Tab),
             plain(BackTab),
             plain(Delete),
             plain(Insert),
@@ -442,14 +579,97 @@ mod tests {
     }
 
     #[test]
+    fn truncates_long_titles() {
+        let overflowing = "A chapter title much longer than the pane";
+        let line = sidebar_line("· ", overflowing);
+        assert_eq!(line.chars().count(), 20);
+        assert!(line.ends_with('…'));
+        assert_eq!(sidebar_line("· ", "Chapter Two"), "· Chapter Two");
+    }
+
+    #[test]
     fn keeps_chapter_on_resize() {
         let book = miniepub::open(EPUB).unwrap();
         let mut viewer = Viewer::new(&book, SLIVER).unwrap();
 
         viewer.resize();
-        assert!(viewer.area.width > 0);
+        assert!(viewer.screen.width > 0);
         let rendered = render_chapter(&viewer);
         assert!(rendered.contains("This is the first chapter."));
         assert!(rendered.contains("1 / 3"));
+    }
+
+    #[test]
+    fn lists_chapters_in_the_sidebar() {
+        let book = miniepub::open(EPUB).unwrap();
+        let viewer = Viewer::new(&book, WIDE).unwrap();
+
+        let rendered = render_chapter(&viewer);
+        assert!(rendered.contains("▸ Chapter One"));
+        assert!(rendered.contains("· Chapter Two"));
+        assert!(rendered.contains("· Chapter Three"));
+        assert!(rendered.contains("│"));
+    }
+
+    #[test]
+    fn marks_the_current_chapter() {
+        let book = miniepub::open(EPUB).unwrap();
+        let mut viewer = Viewer::new(&book, WIDE).unwrap();
+
+        assert!(render_chapter(&viewer).contains("▸ Chapter One"));
+        viewer.apply(&Action::NextChapter).unwrap();
+        let rendered = render_chapter(&viewer);
+        assert!(rendered.contains("▸ Chapter Two"));
+        assert!(!rendered.contains("▸ Chapter One"));
+    }
+
+    #[test]
+    fn hides_the_sidebar_on_a_narrow_screen() {
+        let book = miniepub::open(EPUB).unwrap();
+        let viewer = Viewer::new(&book, NARROW).unwrap();
+
+        assert_eq!(viewer.text_area().width, 40);
+        let rendered = render_chapter(&viewer);
+        assert!(!rendered.contains("· Chapter"));
+        assert!(!rendered.contains("│"));
+    }
+
+    #[test]
+    fn toggles_the_sidebar() {
+        let book = miniepub::open(EPUB).unwrap();
+        let mut viewer = Viewer::new(&book, WIDE).unwrap();
+
+        viewer.apply(&Action::ToggleSidebar).unwrap();
+        let rendered = render_chapter(&viewer);
+        assert!(!rendered.contains("· Chapter"));
+        assert!(!rendered.contains("│"));
+
+        viewer.apply(&Action::ToggleSidebar).unwrap();
+        let rendered = render_chapter(&viewer);
+        assert!(rendered.contains("▸ Chapter One"));
+        assert!(rendered.contains("· Chapter Two"));
+    }
+
+    #[test]
+    fn scrolls_the_sidebar_window() {
+        let book = miniepub::open(EPUB).unwrap();
+        // two sidebar rows for three chapters: the window must follow the current one
+        let slim = Area { left: 0, top: 0, width: 120, height: 2 };
+        let mut viewer = Viewer::new(&book, slim).unwrap();
+
+        let rendered = render_chapter(&viewer);
+        assert!(rendered.contains("▸ Chapter One"));
+        assert!(rendered.contains("· Chapter Two"));
+        assert!(!rendered.contains("Chapter Three"));
+
+        viewer.apply(&Action::NextChapter).unwrap();
+        let rendered = render_chapter(&viewer);
+        assert!(rendered.contains("▸ Chapter Two"));
+        assert!(!rendered.contains("▸ Chapter One"));
+
+        viewer.apply(&Action::NextChapter).unwrap();
+        let rendered = render_chapter(&viewer);
+        assert!(rendered.contains("▸ Chapter Three"));
+        assert!(!rendered.contains("Chapter One"));
     }
 }
