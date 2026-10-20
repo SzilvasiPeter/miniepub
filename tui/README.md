@@ -23,6 +23,6 @@ The viewer takes over the terminal (alternate screen + raw mode) and shows one c
 
 The status line under the text shows the chapter title, position, and read progress.
 
-A chapter sidebar is drawn at the left, listing the chapter titles with the current one marked `▸` in bold. Press `Tab` to hide or show it whenever you want the extra reading space; on very narrow terminals it stays hidden and the text uses the full width. Long titles are truncated with an ellipsis.
+A chapter sidebar is drawn at the left, listing the chapter titles with the current one marked `▸` in bold. Press `Tab` to hide or show it whenever you want the extra reading space; on very narrow terminals it stays hidden and the text uses the full width.
 
 The viewer requires a terminal; running it with a piped or redirected stdout exits with an error instead.
