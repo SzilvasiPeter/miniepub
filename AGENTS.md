@@ -34,7 +34,7 @@ All linters are configured in `Cargo.toml` and run via just recipes:
 - `just lint` - fmt, clippy, machete
 - `just lint-workflows` - actionlint + zizmor on `.github/workflows/`
 - `just coverage` - coverage gate (80% line minimum)
-- `just safety` - audit, geiger, deny 
+- `just safety` - audit, issafe, deny 
 
 ## TDD Workflow
 

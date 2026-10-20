@@ -24,7 +24,7 @@ pub enum Error {
     UnsupportedCompression(String),
     /// The rootfile full-path is missing from container.xml.
     MissingRootfile,
-    /// The nav document is missing from the manifest.
+    /// Neither a navigation document (EPUB 3) nor an NCX (EPUB 2) provides a table of contents.
     MissingNav,
     /// The chapter index is out of bounds.
     IndexOutOfBounds(usize),
@@ -41,7 +41,9 @@ impl fmt::Display for Error {
             Self::EntryNotFound(path) => write!(f, "entry not found: {path}"),
             Self::UnsupportedCompression(method) => write!(f, "unsupported compression: {method}"),
             Self::MissingRootfile => write!(f, "missing rootfile full-path in container.xml"),
-            Self::MissingNav => write!(f, "missing nav document in manifest"),
+            Self::MissingNav => {
+                write!(f, "missing table of contents (neither a nav document nor an NCX)")
+            }
             Self::IndexOutOfBounds(index) => write!(f, "chapter index {index} out of bounds"),
         }
     }

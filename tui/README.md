@@ -1,3 +1,3 @@
 # miniepub-tui
 
-A minimal EPUB reader terminal user interface. Placeholder: the interactive TUI is not implemented yet.
+A minimal EPUB reader terminal user interface. Renders the book's markdown content to the terminal.
