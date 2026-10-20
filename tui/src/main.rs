@@ -5,21 +5,28 @@
 // remove allow lint after the https://github.com/JelteF/derive_more/pull/567 PR is solved.
 #![allow(clippy::multiple_crate_versions)]
 use std::env;
+use std::io;
+use std::io::IsTerminal;
 use std::process;
+
+pub mod viewer;
 
 fn main() {
     let Some(path) = env::args().nth(1) else {
         eprintln!("Usage: miniepub-tui <epub-file>");
         process::exit(1);
     };
-    if let Err(err) = render(&path) {
+    if !io::stdout().is_terminal() {
+        eprintln!("miniepub-tui requires a terminal");
+        process::exit(1);
+    }
+    if let Err(err) = run(&path) {
         eprintln!("Error: {err}");
         process::exit(1);
     }
 }
 
-fn render(path: &str) -> Result<(), miniepub::Error> {
+fn run(path: &str) -> Result<(), miniepub::Error> {
     let book = miniepub::open(path)?;
-    termimad::print_text(&book.all()?);
-    Ok(())
+    viewer::run(&book)
 }
