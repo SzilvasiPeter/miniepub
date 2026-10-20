@@ -14,7 +14,7 @@ name = "miniepub"
 path = "src/main.rs"
 
 [dependencies]
-miniepub = { path = "../core", version = "0.3.0" }
+miniepub = { path = "../core", version = "0.4.0" }
 
 [dev-dependencies]
 assert_cmd = "2.2.2"

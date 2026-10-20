@@ -10,7 +10,7 @@ keywords = ["epub", "tui", "ebook", "terminal"]
 categories = ["command-line-interface"]
 
 [dependencies]
-miniepub = { path = "../core", version = "0.3.0" }
+miniepub = { path = "../core", version = "0.4.0" }
 termimad = { version = "0.35.5", default-features = false }
 
 [dev-dependencies]
