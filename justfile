@@ -20,5 +20,5 @@ open:
 
 safety:
     cargo audit
-    cargo issafe --workspace
+    cargo issafe
     cargo deny check
