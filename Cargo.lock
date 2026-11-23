@@ -302,9 +302,9 @@ checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
 
 [[package]]
 name = "mdream"
-version = "2.0.3"
+version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ed471b10d8710e777f3d8864dd7c2711aaa98331e002b6cffb3b14735a01b37"
+checksum = "5424a4181fc304424e4428181e874870481aef02ce685a0221cf51c4213d9d0a"
 
 [[package]]
 name = "memchr"
